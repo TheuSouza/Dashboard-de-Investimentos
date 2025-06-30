@@ -358,8 +358,8 @@ class PortfolioApp(QWidget):
     def adicionar_ativo(self):
         codigo_original = self.codigo_input.text().strip().upper()
         try:
-            qtd_nova = float(self.qtd_input.text().strip())
-            preco_entrada = float(self.preco_medio_input.text().strip())
+            qtd_nova = float(self.qtd_input.text().strip().replace(',', '.'))
+            preco_entrada = float(self.preco_medio_input.text().strip().replace(',', '.'))
         except ValueError:
             QMessageBox.warning(self, "Erro", "Valores inválidos.")
             return
@@ -398,9 +398,13 @@ class PortfolioApp(QWidget):
                 QMessageBox.warning(self, "Erro", f"Erro ao buscar {codigo_formatado}")
                 return
 
-            if not codigo_formatado.endswith(".SA") or codigo_original in ["BTC", "ETH"]:
+            if not codigo_formatado.endswith(".SA"):
                 preco_entrada *= dolar_em_reais
                 preco_atual *= dolar_em_reais
+
+            if codigo_original in ["BTC", "ETH"]:
+                preco_entrada /= dolar_em_reais
+
 
             preco_medio_novo = preco_entrada
             total_investido_novo = qtd_nova * preco_medio_novo
@@ -428,7 +432,9 @@ class PortfolioApp(QWidget):
                         (qtd_existente * preco_medio_existente + qtd_nova * preco_medio_novo)
                         / qtd_total
                     )
+
                     total_investido_total = qtd_total * preco_medio_total
+                    total_atual = qtd_total * preco_atual
                     variacao = ((preco_atual - preco_medio_total) / preco_medio_total) * 100
                     status_final = "Valorizou" if variacao > 0 else "Desvalorizou"
 
