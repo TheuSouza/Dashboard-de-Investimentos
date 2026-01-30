@@ -310,7 +310,12 @@ class PortfolioApp(QWidget):
         layout = QVBoxLayout(widget)
         
         total = df["Total"].astype(float).sum() if not df.empty else 0.0
-        variacao = ((df['Total'].astype(float).sum() / df['Total Investido'].astype(float).sum() - 1) * 100)
+        total_investido = df['Total Investido'].astype(float).sum()
+
+        if total_investido > 0:
+            variacao = (total / total_investido - 1) * 100
+        else:
+            variacao = 0.0
 
         layout.addLayout(self.criar_label_total_e_variacao(titulo=titulo, total=total, variacao=variacao))
 
@@ -320,7 +325,7 @@ class PortfolioApp(QWidget):
         if df.empty:
             ax.text(0.5, 0.5, "Sem dados", ha='center', va='center')
         else:
-            distribuicao = df.groupby("Código", sort=False)["Total Investido"].sum()
+            distribuicao = df.groupby("Código", sort=False)["Total"].sum()
             distribuicao = distribuicao.sort_values(ascending=False)
             labels = distribuicao.index
             valores = distribuicao.values
@@ -334,7 +339,7 @@ class PortfolioApp(QWidget):
                 colors=cores,
                 wedgeprops={'width': 0.6},
                 textprops={'fontsize': 8},
-                pctdistance=0.75
+                pctdistance=0.75,
             )
 
             centre_circle = plt.Circle((0, 0), 0.55, fc='white')
@@ -398,12 +403,9 @@ class PortfolioApp(QWidget):
                 QMessageBox.warning(self, "Erro", f"Erro ao buscar {codigo_formatado}")
                 return
 
-            if not codigo_formatado.endswith(".SA"):
+            if not codigo_formatado.endswith(".SA") or codigo_original in ["BTC", "ETH"]:
                 preco_entrada *= dolar_em_reais
                 preco_atual *= dolar_em_reais
-
-            if codigo_original in ["BTC", "ETH"]:
-                preco_entrada /= dolar_em_reais
 
 
             preco_medio_novo = preco_entrada
@@ -625,8 +627,12 @@ class PortfolioApp(QWidget):
                     QMessageBox.warning(self, "Erro", f"Erro ao buscar {codigo_formatado}")
                     return
 
-                if not codigo_formatado.endswith(".SA") or codigo_original in ["BTC", "ETH"]:
+                if not codigo_formatado.endswith(".SA"):
                     preco_atual *= dolar_em_reais
+
+                if codigo_original in ["BTC", "ETH"]:
+                    preco_atual = preco_atual
+
 
                 total_atual = qtd * preco_atual
                 variacao = ((preco_atual - preco_medio) / preco_medio) * 100
