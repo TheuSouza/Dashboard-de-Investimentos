@@ -20,20 +20,22 @@ from matplotlib.figure import Figure
 CSV_FILE = "projeto_v4/carteira_1.csv"
 
 PALETA_CORES = [
-    "#e6194b",  # vermelho
-    "#f58231",  # laranja
-    "#ffe119",  # amarelo
-    "#bfef45",  # verde limão
-    "#3cb44b",  # verde
-    "#42d4f4",  # ciano
-    "#4363d8",  # azul
-    "#911eb4",  # roxo
-    "#f032e6",  # rosa
-    "#fabebe",  # rosa claro
-    "#ffd8b1",  # pêssego
-    "#dcbeff",  # lavanda
-    "#aaffc3",  # verde menta
-    "#fffac8",  # amarelo pastel
+    "#e6194b",
+    "#f58231",
+    "#ffe119",
+    "#bfef45",
+    "#3cb44b",
+    "#304e17",
+    "#42d4f4",
+    "#4363d8",
+    "#062e60",
+    "#dcbeff",
+    "#7D068D",
+    "#5f1dac",
+    "#EC17FF",
+    "#FF07B4",
+    "#aaffc3",
+    "#fffac8",
 ]
 
 
@@ -222,8 +224,8 @@ class PortfolioApp(QWidget):
         grid_layout.addWidget(self.criar_grafico(acoes, "Ações BR"), 0, 0)
         grid_layout.addWidget(self.criar_grafico(fundos, "FIIs"), 0, 1)
         grid_layout.addWidget(self.criar_grafico(acoes_usa, "Ações EUA"), 0, 2)
-        grid_layout.addWidget(self.criar_grafico(cripto, "Criptomoedas"), 0, 3)
-        grid_layout.addWidget(self.criar_grafico(fixa, "Renda Fixa"), 0, 4)
+        #rid_layout.addWidget(self.criar_grafico(cripto, "Criptomoedas"), 0, 3)
+        #grid_layout.addWidget(self.criar_grafico(fixa, "Renda Fixa"), 0, 4)
 
         self.grafico_layout.addLayout(grid_layout)
 
@@ -319,7 +321,7 @@ class PortfolioApp(QWidget):
 
         layout.addLayout(self.criar_label_total_e_variacao(titulo=titulo, total=total, variacao=variacao))
 
-        canvas = FigureCanvas(Figure(figsize=(5, 5)))
+        canvas = FigureCanvas(Figure(figsize=(5.6, 5.6)))
         ax = canvas.figure.subplots()
 
         if df.empty:
