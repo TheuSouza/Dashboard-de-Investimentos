@@ -62,8 +62,8 @@ class InterfaceFinanceira(QTabWidget):
 
 if __name__ == '__main__':
     papeis_acoes = ['brap3', 'bbdc3', 'cmig4', 'jhsf3', 'grnd3', 'itsa4', 'isae4', 'ligt3', 'sapr4', 'bbas3', 'cmin3']
-    papeis_fii = ['gare11', 'brcr11', 'xpsf11', 'trbl11', 'xpin11']
-    papeis_fiagro = ['knca11', 'vgia11', 'rura11', 'oiag11', 'xpca11']
+    papeis_fii = ['gare11', 'brcr11', 'trbl11', 'xpin11']
+    papeis_fiagro = ['vgia11', 'rura11', 'oiag11', 'xpca11']
 
     hoje = date.today().isoformat()
     atualizar = False

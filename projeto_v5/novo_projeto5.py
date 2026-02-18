@@ -1,3 +1,6 @@
+import os
+os.environ["QT_LOGGING_RULES"] = "qt.qpa.screen=false"
+
 import sys
 import yfinance as yf
 import pandas as pd
@@ -17,11 +20,13 @@ matplotlib.use("QtAgg")
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
+
 CSV_FILE = "projeto_v5/carteira_1.csv"
 
 PALETA_CORES = [
-    "#e6194b",
-    "#f58231",
+    "#550202",
+    "#BD1E1E",
+    "#dd6108",
     "#ffe119",
     "#bfef45",
     "#3cb44b",
@@ -29,11 +34,10 @@ PALETA_CORES = [
     "#42d4f4",
     "#4363d8",
     "#062e60",
-    "#dcbeff",
-    "#7D068D",
-    "#5f1dac",
-    "#EC17FF",
-    "#FF07B4",
+    "#8F0747",
+    "#CA2B9B",
+    "#f892ce",
+    "#FFFFFF",
     "#aaffc3",
     "#fffac8",
 ]
@@ -179,6 +183,24 @@ class PortfolioApp(QWidget):
 
         self.botoes_filtro["Todos"].setChecked(True)
         main_layout.addLayout(filtro_layout)
+    
+
+
+    # OBTER A COTAÇÃO DO DOLAR E RESOLVER ERROS
+    def obter_cotacao(self, ticker_symbol: str) -> float:
+        ticker = yf.Ticker(ticker_symbol)
+
+        # 1️⃣ tenta intraday (mercado aberto)
+        hist = ticker.history(period="1d")
+        if not hist.empty and "Close" in hist:
+            return float(hist["Close"].iloc[-1])
+
+        # 2️⃣ fallback: último fechamento disponível
+        hist = ticker.history(period="30d")
+        if not hist.empty and "Close" in hist:
+            return float(hist["Close"].dropna().iloc[-1])
+
+        raise RuntimeError(f"Sem dados válidos para {ticker_symbol}")
 
 
 
@@ -217,8 +239,6 @@ class PortfolioApp(QWidget):
         self.atualizar_graficos(dados_filtrados)
 
 
-
-    
 
     # - CRIA O CABEÇALHO DOS GRAFICOS DA INTERFACE
     def criar_label_total_e_variacao(self, titulo, total, variacao, total_ativos=''):
@@ -473,22 +493,17 @@ class PortfolioApp(QWidget):
         else:
             dolar_em_reais = 1.0
             if not codigo_original.endswith(".SA") or codigo_original in ["BTC", "ETH"]:
-                try:
-                    dolar_ticker = yf.Ticker("USDBRL=X")
-                    dolar_em_reais = dolar_ticker.history(period="1d")["Close"].iloc[-1]
-                except Exception:
+                dolar_em_reais = self.obter_cotacao("USDBRL=X")
+                if dolar_em_reais is None:
                     QMessageBox.warning(self, "Erro", "Erro ao obter cotação do dólar.")
                     return
 
             codigo_formatado = self.formatar_codigo(codigo_original)
-            try:
-                ticker = yf.Ticker(codigo_formatado)
-                preco_atual = ticker.history(period="1d")["Close"].iloc[-1]
-                if pd.isna(preco_atual):
-                    raise Exception("Preço inválido")
-            except Exception:
+
+            preco_atual = self.obter_cotacao(codigo_formatado)
+            if preco_atual == None:
                 QMessageBox.warning(self, "Erro", f"Erro ao buscar {codigo_formatado}")
-                return
+
 
             if not codigo_formatado.endswith(".SA") or codigo_original in ["BTC", "ETH"]:
                 preco_entrada *= dolar_em_reais
@@ -690,7 +705,6 @@ class PortfolioApp(QWidget):
             self.reconstruir_tabela(self.dados_completos)
 
 
-
     
     # - ATUALIZA OS VALORES DOS ATIVOS AO CLICAR NO BOTÃO NA INTERFACE
     def atualizar_valores_ativos(self):
@@ -699,34 +713,19 @@ class PortfolioApp(QWidget):
             QMessageBox.information(self, "Aviso", "Não há ativos para atualizar.")
             return
 
-        # INÍCIO: Cria a barra de progresso
-        progresso = QProgressDialog("Buscando cotações...", None, 0, total_linhas, self)
+        progresso = QProgressDialog(
+            "Buscando cotações...", None, 0, total_linhas, self
+        )
         progresso.setWindowTitle("Atualizando Carteira")
         progresso.setWindowModality(Qt.WindowModal)
         progresso.setMinimumDuration(0)
-        progresso.resize(400, 100)
+        progresso.show()
 
-        progresso.setStyleSheet("""
-            QProgressBar {
-                border: 1px solid #fff;
-                border-radius: 4px;
-                text-align: center;
-                height: 20px;
-                font-weight: bold;
-                color: #fff;
-                background-color: #1C1C1C;
-            }
-            QProgressBar::chunk {
-                background-color: #228B22;
-                width: 20px;
-            }
-            QLabel {
-                color: #1C1C1C;
-                font-size: 14px;
-            }
-        """)
-        # FIM
-
+        # 🔹 Busca dólar UMA VEZ
+        dolar = self.obter_cotacao("USDBRL=X")
+        if dolar is None:
+            QMessageBox.warning(self, "Erro", "Erro ao obter cotação do dólar.")
+            return
 
         for row in range(total_linhas):
             if progresso.wasCanceled():
@@ -736,54 +735,62 @@ class PortfolioApp(QWidget):
             qtd = float(self.tabela.item(row, 1).text())
             preco_medio = float(self.tabela.item(row, 2).text())
 
+            codigo_formatado = self.formatar_codigo(codigo_original)
             is_fixo = codigo_original in ["TESOURO", "CDB", "CDI"]
+            is_fii = codigo_original.endswith("11")
+            is_br = codigo_original.endswith(("3", "4", "11"))
+            is_crypto = codigo_original in ["BTC", "ETH"]
+
+
+            # ================= FIXO =================
             if is_fixo:
                 preco_atual = preco_medio
-                total_atual = preco_atual
+                total_atual = qtd * preco_atual
                 variacao = 0.0
                 status = "Fixo"
+
+            # ================= MERCADO =================
             else:
-                dolar_em_reais = 1.0
-                if not codigo_original.endswith(".SA") or codigo_original in ["BTC", "ETH"]:
-                    try:
-                        dolar_ticker = yf.Ticker("USDBRL=X")
-                        dolar_em_reais = dolar_ticker.history(period="1d")["Close"].iloc[-1]
-                    except Exception:
-                        QMessageBox.warning(self, "Erro", "Erro ao obter cotação do dólar.")
-                        return
+                preco_atual = self.obter_cotacao(codigo_formatado)
 
-                codigo_formatado = self.formatar_codigo(codigo_original)
-                try:
-                    ticker = yf.Ticker(codigo_formatado)
-                    preco_atual = ticker.history(period="1d")["Close"].iloc[-1]
-                    if pd.isna(preco_atual):
-                        raise Exception("Preço inválido")
-                except Exception:
-                    QMessageBox.warning(self, "Erro", f"Erro ao buscar {codigo_formatado}")
-                    return
+                if preco_atual is None:
+                    QMessageBox.warning(
+                        self, "Erro", f"Erro ao buscar {codigo_formatado}"
+                    )
+                    continue
 
-                if not codigo_formatado.endswith(".SA"):
-                    preco_atual *= dolar_em_reais
-
-                if codigo_original in ["BTC", "ETH"]:
-                    preco_atual = preco_atual
-
+                # 🔹 Apenas ações EUA sofrem câmbio
+                if not is_br and not is_crypto:
+                    preco_atual *= dolar
 
                 total_atual = qtd * preco_atual
-                variacao = ((preco_atual - preco_medio) / preco_medio) * 100
+
+                if preco_medio > 0:
+                    variacao = ((preco_atual - preco_medio) / preco_medio) * 100
+                else:
+                    variacao = 0.0
+
                 status = "Valorizou" if variacao > 0 else "Desvalorizou"
 
-            self.tabela.setItem(row, 4, QTableWidgetItem(str(round(preco_atual, 2))))
-            self.tabela.setItem(row, 5, QTableWidgetItem(str(round(total_atual, 2))))
-            self.tabela.setItem(row, 6, QTableWidgetItem(str(round(variacao, 2))))
+
+            # ================= TABELA =================
+            self.tabela.setItem(row, 4, QTableWidgetItem(f"{preco_atual:.2f}"))
+            self.tabela.setItem(row, 5, QTableWidgetItem(f"{total_atual:.2f}"))
+            self.tabela.setItem(row, 6, QTableWidgetItem(f"{variacao:.2f}"))
 
             status_item = QTableWidgetItem(status)
             status_item.setTextAlignment(Qt.AlignCenter)
             if status == "Valorizou":
-                status_item.setForeground(Qt.GlobalColor.darkGreen)
+                status_item.setForeground(Qt.darkGreen)
             elif status == "Desvalorizou":
-                status_item.setForeground(Qt.GlobalColor.red)
+                status_item.setForeground(Qt.red)
             self.tabela.setItem(row, 7, status_item)
+
+            # ================= DADOS INTERNOS =================
+            self.dados_completos[row][4] = round(preco_atual, 2)
+            self.dados_completos[row][5] = round(total_atual, 2)
+            self.dados_completos[row][6] = round(variacao, 2)
+            self.dados_completos[row][7] = status
 
             progresso.setValue(row + 1)
             QApplication.processEvents()
@@ -791,6 +798,7 @@ class PortfolioApp(QWidget):
         progresso.close()
         self.salvar_em_csv()
         self.atualizar_graficos()
+
 
 
 if __name__ == "__main__":
